@@ -502,6 +502,37 @@ curl localhost:6030?name=Jonathan
 ```
 At this point, the front-app should get the increased occurrence count from the state store, saved by the name-processor app, because now both apps work against the global shared state store. 
 
+## Go applications and Dapr
+
+Directory *dapr-go* contains a simple straightforward Go application. This application uses the Dapr Go SDK - to save state and retrieve state. Nothing very useful - but a working example of Go and the Dapr SDK.
+
+Note: Go has great gRPC support and it is recommended to have the Go application interact with its Dapr sidecar over gRPC.
+
+Run the application using this command:
+```
+dapr run --app-id orderprocessing --dapr-grpc-port 60006 go run OrderService.go
+```
+The value passed in a *dapr-grpc-port* is available in the Go application as environment variable and that value is used to initialize the Dapr Client that interacts from the application to the Sidecar. 
+
+Check the logs that are produced when you execute this command. You will see Dapr starting, the application starting and looking for the Dapr Sidecar on GRPC port 60006 and then when finding it (alive and kicking) reporting that application and sidecar have joined forces and are ready for action. This action subsequently commences.
+
+```
+ℹ️  Starting Dapr with id orderprocessing. HTTP Port: 35875. gRPC Port: 60006
+ℹ️  Checking if Dapr sidecar is listening on HTTP port 35875
+....
+WARN[0000] app channel not initialized, make sure -app-port is specified if pubsub subscription is required  app_id=orderprocessing instance=DESKTOP-NIQR4P9 scope=dapr.runtime type=log ver=edge
+WARN[0000] failed to read from bindings: app channel not initialized   app_id=orderprocessing instance=DESKTOP-NIQR4P9 scope=dapr.runtime type=log ver=edge
+INFO[0000] dapr initialized. Status: Running. Init Elapsed 9.1305ms  app_id=orderprocessing instance=DESKTOP-NIQR4P9 scope=dapr.runtime type=log ver=edge
+INFO[0000] placement tables updated, version: 0          app_id=orderprocessing instance=DESKTOP-NIQR4P9 scope=dapr.runtime.actor.internal.placement type=log ver=edge
+ℹ️  Checking if Dapr sidecar is listening on GRPC port 60006
+ℹ️  Dapr sidecar is up and running.
+ℹ️  Updating metadata for app command: go run OrderService.go
+✅  You're up and running! Both Dapr and your app logs will appear here.
+```
+
+More details on the [Go Client SDK for Dapr](https://docs.dapr.io/developing-applications/sdks/go/go-client/)
+
+
 ## Telemetry, Traces and Dependencies
 Open the URL [localhost:9411/](http://localhost:9411/) in your browser. This opens Zipkin, the telemetry collector shipped with Dapr.io. It provides insight in the traces collected from interactions between Daprized applications and via Dapr sidecars. This helps us understand which interactions have taken place, how long each leg of an end-to-end flow has lasted, where things went wrong and what the nature was of each interaction. And it also helps learn about indirect interactions.
 
