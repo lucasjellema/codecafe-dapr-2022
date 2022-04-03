@@ -1,12 +1,21 @@
 # Handson for Conclusion Code Cafe on Dapr.io - April 2022
 
-- [Introduction to Dapr.io and](#introduction-to-daprio-and)
+- [Handson for Conclusion Code Cafe on Dapr.io - April 2022](#handson-for-conclusion-code-cafe-on-daprio---april-2022)
   - [1. Setting up Dapr.io](#1-setting-up-daprio)
     - [a. Installing the Dapr.io CLI](#a-installing-the-daprio-cli)
     - [b. Initialize Dapr in your local environment](#b-initialize-dapr-in-your-local-environment)
   - [2. Playing with Dapr State Store capability](#2-playing-with-dapr-state-store-capability)
   - [3. Using a MySQL Database as a Dapr State Store](#3-using-a-mysql-database-as-a-dapr-state-store)
   - [4. Telemetry](#4-telemetry)
+- [Dapr.io and Node applications](#daprio-and-node-applications)
+  - [Node Runtime Environment](#node-runtime-environment)
+  - [Node and Dapr](#node-and-dapr)
+    - [A second application](#a-second-application)
+  - [Node and Dapr - Pub/Sub for Asynchronous Communications](#node-and-dapr---pubsub-for-asynchronous-communications)
+    - [Publishing from Node](#publishing-from-node)
+  - [Leverage Dapr Pub/Sub between Front App and Node App](#leverage-dapr-pubsub-between-front-app-and-node-app)
+  - [Go applications and Dapr](#go-applications-and-dapr)
+  - [Telemetry, Traces and Dependencies](#telemetry-traces-and-dependencies)
   - [Closure](#closure)
   - [Resources](#resources)
 
@@ -566,6 +575,8 @@ const r = await client.invoker.invoke(someServiceAppId, method, HttpMethod.POST,
 ```
 The Node application asks its own sidecar to make the call - it does not know where *some-service* can be found nor how it has been implemented. The fact that it calls a locally running service - currently only once instance - implemented in Go is unknown. When that fact changes, it would also be unknown and therefore have no impact. 
 
+![](images/node-invokes-go-through-dapr.png)
+
 Run the Node application with this command. A Dapr Sidecar is started along with the Node application it works for (someServiceInvoker.js)
 ```
 dapr run --app-id some-service-invoker \
@@ -576,6 +587,7 @@ dapr run --app-id some-service-invoker \
 You should see the result returned from the Go application - routed between the two sidecars (my people talk to your people). 
 
 By the way, the gRPC based call to the *echo* operation exposed by *someService* can also be made directly from the Node application to someService's sidecar - it does not have to go through a local sidecar. However, use of the local sidecar decouples the Node application from the details - host, gRPC port, potentially load balancing over multiple instances - of someService.
+![](images/node-calls-method-on-sidecar.png)
 
 
 ## Telemetry, Traces and Dependencies
