@@ -504,7 +504,7 @@ At this point, the front-app should get the increased occurrence count from the 
 
 ## Go applications and Dapr
 
-Directory *dapr-go* contains a simple straightforward Go application. This application uses the Dapr Go SDK - to save state and retrieve state. Nothing very useful - but a working example of Go and the Dapr SDK.
+Directory *dapr-go-state* contains a simple straightforward Go application. This application uses the Dapr Go SDK - to save state and retrieve state. Nothing very useful - but a working example of Go and the Dapr SDK.
 
 Note: Go has great gRPC support and it is recommended to have the Go application interact with its Dapr sidecar over gRPC.
 
@@ -532,13 +532,58 @@ INFO[0000] placement tables updated, version: 0          app_id=orderprocessing 
 
 More details on the [Go Client SDK for Dapr](https://docs.dapr.io/developing-applications/sdks/go/go-client/)
 
+```
+dapr run --app-id some-service \
+         --app-protocol grpc \
+         --app-port 50001 \
+         --dapr-grpc-port 3500 \
+         --dapr-http-port 3600 \
+         --log-level debug \
+         go run SomeService.go
+```
+
+In another terminal window:
+
+```
+curl http://localhost:3600/v1.0/invoke/some-service/method/echo?name=John \
+  -H "Content-Type: application/json" \
+  -d '{ "arg1": 10, "arg2": 23}'
+```
+The result is a copy of the payload. More interestingly, the logs produced by the Daprized Go application show the details for the HTTP request. That means that the Go application has linked up with its sidecare over gRPC, has indicated its willingness to accept invocations for an operation called *echo* and is now triggered by the sidecar when we make an HTTP call to the Dapr API for service invocations. Note that we did not make a gRPC call, nor do we know anything about the implementation of the service we have invoked. 
+
+It is but small additional step to send service invocations from other services - instead of from curl on the command line.
+
+In directory */hello-world-dapr* is a Node application: *someServiceInvoker.js*. This small application uses the Dapr Node SDK to make a service call - to a service known as *some-service*. 
+
+```
+const client = new DaprClient(mySidecarHost, mySidecargRPCPort, CommunicationProtocolEnum.GRPC);
+
+const method = "echo" // corresponds to the name of the service invocation handler registered by SomeService.go
+const r = await client.invoker.invoke(someServiceAppId, method, HttpMethod.POST, { hello: "world" });
+    console.log(`after calling method ${method} on service ${someServiceAppId} - 
+                 the response received was ${JSON.stringify(r)}`)
+}
+```
+The Node application asks its own sidecar to make the call - it does not know where *some-service* can be found nor how it has been implemented. The fact that it calls a locally running service - currently only once instance - implemented in Go is unknown. When that fact changes, it would also be unknown and therefore have no impact. 
+
+Run the Node application with this command. A Dapr Sidecar is started along with the Node application it works for (someServiceInvoker.js)
+```
+dapr run --app-id some-service-invoker \
+         --app-protocol grpc \
+         --log-level debug \
+         node someServiceInvoker.js
+```
+You should see the result returned from the Go application - routed between the two sidecars (my people talk to your people). 
+
+By the way, the gRPC based call to the *echo* operation exposed by *someService* can also be made directly from the Node application to someService's sidecar - it does not have to go through a local sidecar. However, use of the local sidecar decouples the Node application from the details - host, gRPC port, potentially load balancing over multiple instances - of someService.
+
 
 ## Telemetry, Traces and Dependencies
 Open the URL [localhost:9411/](http://localhost:9411/) in your browser. This opens Zipkin, the telemetry collector shipped with Dapr.io. It provides insight in the traces collected from interactions between Daprized applications and via Dapr sidecars. This helps us understand which interactions have taken place, how long each leg of an end-to-end flow has lasted, where things went wrong and what the nature was of each interaction. And it also helps learn about indirect interactions.
 
 ![](images/zipkin-telemetery-collection.png)
 
-Query Zipkin for traces. You should find traces that start at *greeter* and also include *name-processor*. You now that we have removed the dependency from *greeter* on *name-processor* by having the information flow via the pubsub component. How does Zipkin know that greeter and name-processor are connected? Of course this is based on information provided by Dapr. Every call made by Dapr Sidecars includes a special header that identifies a trace or conversation. This header is added to messages published to a pubsub component and when a Dapr sidecar consumes such a message, it reads the header value and reports to Zipkin that it has processed a message on behalf of its application and it includes the header in that report. Because Zipkin already received that header when the Dapr sidecar that published the message (on behalf of the greeter application) reported its activity, Zipkin can construct the overall picture.
+Query Zipkin for traces. You should find traces that start at *greeter* and also include *name-processor*. You know that we have removed the dependency from *greeter* on *name-processor* by having the information flow via the pubsub component. How does Zipkin know that greeter and name-processor are connected? Of course this is based on information provided by Dapr. Every call made by Dapr Sidecars includes a special header that identifies a trace or conversation. This header is added to messages published to a pubsub component and when a Dapr sidecar consumes such a message, it reads the header value and reports to Zipkin that it has processed a message on behalf of its application and it includes the header in that report. Because Zipkin already received that header when the Dapr sidecar that published the message (on behalf of the greeter application) reported its activity, Zipkin can construct the overall picture.
 
 When you go to the Dependencies tab in Zipkin, you will find a visual representation of the dependencies Zipkin has learned about. Granted, there are not that many now, but you can imagine how this type of insight in a complex network of microservices could add useful insights.
 
