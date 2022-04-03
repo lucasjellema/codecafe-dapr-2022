@@ -603,6 +603,7 @@ async function complexCalculation(a,b,c) {
 }
 ```
 This function takes three numeric input parameters and returns the result of some complex calculation. This calculation does not happen in the function itself. It relies on the remote *SomeService* that offers the *calculate* method. The function uses its Dapr sidecar to make a call to that remote service.
+![](images/remote-call-calculate.png)
 
 The implementation of the *calculate* method is in the function *calculationHandler* in the Go application *SomeService.go*. This function is registered with the Dapr sidecar for *SomeService* to handle invocations to the *calculate* method. It creates an Operands object from the request payload, performs the (perfectly meaningless) calculation and composes a *Result* that is marshalled to a JSON string that is returned as the response to the method call. 
 ```
