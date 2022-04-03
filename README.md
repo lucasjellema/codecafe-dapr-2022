@@ -589,6 +589,50 @@ You should see the result returned from the Go application - routed between the 
 By the way, the gRPC based call to the *echo* operation exposed by *someService* can also be made directly from the Node application to someService's sidecar - it does not have to go through a local sidecar. However, use of the local sidecar decouples the Node application from the details - host, gRPC port, potentially load balancing over multiple instances - of someService.
 ![](images/node-calls-method-on-sidecar.png)
 
+For a slightly more interesting remote method invocation, check function *complexCalculation* in the Node application *someServiceInvoker*.
+
+```
+async function complexCalculation(a,b,c) {
+    const method = "calculate"
+    const r = await client.invoker.invoke(someServiceAppId, method, HttpMethod.POST, 
+                                           { x: a, y:b, z:c }
+                                         );
+    console.log(`after calling method ${method} on service ${someServiceAppId} - 
+                 the response received was ${JSON.stringify(r)}`)
+    return r.outcome             
+}
+```
+This function takes three numeric input parameters and returns the result of some complex calculation. This calculation does not happen in the function itself. It relies on the remote *SomeService* that offers the *calculate* method. The function uses its Dapr sidecar to make a call to that remote service.
+
+The implementation of the *calculate* method is in the function *calculationHandler* in the Go application *SomeService.go*. This function is registered with the Dapr sidecar for *SomeService* to handle invocations to the *calculate* method. It creates an Operands object from the request payload, performs the (perfectly meaningless) calculation and composes a *Result* that is marshalled to a JSON string that is returned as the response to the method call. 
+```
+type Operands struct {
+	X float32 `json:"x"`
+	Y float32 `json:"y"`
+	Z float32 `json:"z"`
+}
+
+type Result struct {
+	Outcome float32 `json:"outcome"`
+	Comment string  `json:"comment"`
+}
+
+func calculationHandler(ctx context.Context, in *common.InvocationEvent) (out *common.Content, err error) {
+	log.Printf("calculation - ContentType:%s, Verb:%s, QueryString:%s, %+v", in.ContentType, in.Verb, in.QueryString, string(in.Data))
+	var operands Operands
+	json.Unmarshal(in.Data, &operands)
+	calculationResult := operands.X + 324*operands.Y + 19/operands.Z
+
+	result := Result{Outcome: calculationResult, Comment: "Greetings"}
+	responseBody, err := json.Marshal(result)
+	out = &common.Content{
+		Data:        responseBody,
+		ContentType: in.ContentType,
+		DataTypeURL: in.DataTypeURL,
+	}
+	return
+}
+```
 
 ## Telemetry, Traces and Dependencies
 Open the URL [localhost:9411/](http://localhost:9411/) in your browser. This opens Zipkin, the telemetry collector shipped with Dapr.io. It provides insight in the traces collected from interactions between Daprized applications and via Dapr sidecars. This helps us understand which interactions have taken place, how long each leg of an end-to-end flow has lasted, where things went wrong and what the nature was of each interaction. And it also helps learn about indirect interactions.
